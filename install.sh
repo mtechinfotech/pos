@@ -61,9 +61,36 @@ if [ -f "manage.py" ]; then
     python manage.py collectstatic --noinput || true
 fi
 
-echo "✅ Installation finished!"
+# --- Setup systemd service for auto-start ---
+SERVICE_FILE="/etc/systemd/system/pos.service"
+
+echo "🛠 Creating systemd service for auto-start..."
+
+cat > $SERVICE_FILE <<EOL
+[Unit]
+Description=MTech POS Service
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/venv/bin/python manage.py runserver 0.0.0.0:8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# Reload systemd and enable service
+systemctl daemon-reload
+systemctl enable pos
+systemctl start pos
+
+echo "✅ POS installation & service setup completed!"
 echo ""
-echo "➡ To start the app, run:"
-echo "cd $INSTALL_DIR && source venv/bin/activate && python manage.py runserver 0.0.0.0:8000"
-echo ""
-echo "🌐 Then visit: http://your-server-ip:8000"
+echo "🌐 Your app is running and will auto-start on reboot."
+echo "➡ To check status: systemctl status pos"
+echo "➡ To see logs: journalctl -u pos -f"
+echo "➡ Visit: http://your-server-ip:8000"
