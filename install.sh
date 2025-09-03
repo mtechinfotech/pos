@@ -1,64 +1,69 @@
 #!/bin/sh
+set -e
 
 OUTPUT=$(cat /etc/*release)
-if  echo $OUTPUT | grep -q "CentOS Linux 7" ; then
-        echo "Checking and installing curl and wget"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-                SERVER_OS="CentOS"
-elif echo $OUTPUT | grep -q "CentOS Linux 8" ; then
-        echo -e "\nDetecting Centos 8...\n"
-        SERVER_OS="CentOS8"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-elif echo $OUTPUT | grep -q "AlmaLinux 8" ; then
-        echo -e "\nDetecting AlmaLinux 8...\n"
-        SERVER_OS="CentOS8"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-elif echo $OUTPUT | grep -q "AlmaLinux 9" ; then
-        echo -e "\nDetecting AlmaLinux 9...\n"
-        SERVER_OS="CentOS8"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-elif echo $OUTPUT | grep -q "CloudLinux 7" ; then
-        echo "Checking and installing curl and wget"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-                SERVER_OS="CloudLinux"
-elif echo $OUTPUT | grep -q "CloudLinux 8" ; then
-        echo "Checking and installing curl and wget"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-                SERVER_OS="CloudLinux"
-elif echo $OUTPUT | grep -q "Ubuntu 18.04" ; then
-apt install -y -qq wget curl
-                SERVER_OS="Ubuntu"
-elif echo $OUTPUT | grep -q "Ubuntu 20.04" ; then
-apt install -y -qq wget curl
-                SERVER_OS="Ubuntu"
-elif echo $OUTPUT | grep -q "Ubuntu 22.04" ; then
-apt install -y -qq wget curl
-                SERVER_OS="Ubuntu"
-elif echo $OUTPUT | grep -q "openEuler 20.03" ; then
-        echo -e "\nDetecting openEuler 20.03...\n"
-        SERVER_OS="openEuler"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-elif echo $OUTPUT | grep -q "openEuler 22.03" ; then
-        echo -e "\nDetecting openEuler 22.03...\n"
-        SERVER_OS="openEuler"
-yum install curl wget -y 1> /dev/null
-yum update curl wget ca-certificates -y 1> /dev/null
-else
 
-                echo -e "\nUnable to detect your OS...\n"
-                echo -e "\nCyberPanel is supported on Ubuntu 18.04, Ubuntu 20.04 Ubuntu 22.04, AlmaLinux 8, AlmaLinux 9 and CloudLinux 7.x...\n"
-                exit 1
+# --- Detect OS ---
+if echo $OUTPUT | grep -q "Ubuntu 18.04" ; then
+    apt update -y && apt install -y -qq wget curl git python3 python3-pip python3-venv mariadb-server
+    SERVER_OS="Ubuntu"
+elif echo $OUTPUT | grep -q "Ubuntu 20.04" ; then
+    apt update -y && apt install -y -qq wget curl git python3 python3-pip python3-venv mariadb-server
+    SERVER_OS="Ubuntu"
+elif echo $OUTPUT | grep -q "Ubuntu 22.04" ; then
+    apt update -y && apt install -y -qq wget curl git python3 python3-pip python3-venv mariadb-server
+    SERVER_OS="Ubuntu"
+elif echo $OUTPUT | grep -q "CentOS Linux 7" ; then
+    yum install -y curl wget git python3 python3-pip python3-venv mariadb-server
+    SERVER_OS="CentOS7"
+elif echo $OUTPUT | grep -q "CentOS Linux 8" ; then
+    yum install -y curl wget git python3 python3-pip python3-venv mariadb-server
+    SERVER_OS="CentOS8"
+else
+    echo -e "\n❌ Unsupported OS"
+    echo -e "\nSupported: Ubuntu 18.04/20.04/22.04, CentOS 7/8\n"
+    exit 1
 fi
 
-rm -f cyberpanel.sh
-rm -f install.tar.gz
-curl --silent -o cyberpanel.sh "https://cyberpanel.sh/?dl&$SERVER_OS" 2>/dev/null
-chmod +x cyberpanel.sh
-./cyberpanel.sh $@
+echo "✅ Detected $SERVER_OS"
+
+# --- Install POS from GitHub ---
+INSTALL_DIR="/usr/local/pos"
+
+if [ ! -d "$INSTALL_DIR" ]; then
+    echo "📂 Cloning repository..."
+    git clone https://github.com/mtechinfotech/pos.git $INSTALL_DIR
+else
+    echo "🔄 Updating repository..."
+    cd $INSTALL_DIR && git pull
+fi
+
+cd $INSTALL_DIR
+
+# --- Python Virtual Environment ---
+if [ ! -d "venv" ]; then
+    echo "🐍 Creating Python virtual environment..."
+    python3 -m venv venv
+fi
+
+. venv/bin/activate
+pip install --upgrade pip
+
+if [ -f "requirements.txt" ]; then
+    echo "📦 Installing Python dependencies..."
+    pip install -r requirements.txt
+fi
+
+# --- Database (Django assumed) ---
+if [ -f "manage.py" ]; then
+    echo "🗂 Running Django migrations..."
+    python manage.py migrate
+    python manage.py collectstatic --noinput || true
+fi
+
+echo "✅ Installation finished!"
+echo ""
+echo "➡ To start the app, run:"
+echo "cd $INSTALL_DIR && source venv/bin/activate && python manage.py runserver 0.0.0.0:8000"
+echo ""
+echo "🌐 Then visit: http://your-server-ip:8000"
