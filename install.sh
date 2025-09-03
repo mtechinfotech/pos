@@ -13,6 +13,9 @@ elif echo $OUTPUT | grep -q "Ubuntu 20.04" ; then
 elif echo $OUTPUT | grep -q "Ubuntu 22.04" ; then
     apt update -y && apt install -y -qq wget curl git python3 python3-pip python3-venv mariadb-server
     SERVER_OS="Ubuntu"
+elif echo $OUTPUT | grep -q "Ubuntu 24.04" ; then
+    apt update -y && apt install -y -qq wget curl git python3 python3-pip python3-venv mariadb-server
+    SERVER_OS="Ubuntu24"
 elif echo $OUTPUT | grep -q "CentOS Linux 7" ; then
     yum install -y curl wget git python3 python3-pip python3-venv mariadb-server
     SERVER_OS="CentOS7"
@@ -21,7 +24,7 @@ elif echo $OUTPUT | grep -q "CentOS Linux 8" ; then
     SERVER_OS="CentOS8"
 else
     echo -e "\n❌ Unsupported OS"
-    echo -e "\nSupported: Ubuntu 18.04/20.04/22.04, CentOS 7/8\n"
+    echo -e "\nSupported: Ubuntu 18.04/20.04/22.04/24.04, CentOS 7/8\n"
     exit 1
 fi
 
